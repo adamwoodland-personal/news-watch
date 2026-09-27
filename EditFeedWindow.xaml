@@ -1,0 +1,196 @@
+<Window x:Class="NewsWatch.EditFeedWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:NewsWatch"
+        Title="Feed"
+        Width="520" SizeToContent="Height"
+        Background="{StaticResource BgBrush}"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        FontFamily="Segoe UI"
+        ShowInTaskbar="False">
+
+    <Window.Resources>
+        <!-- Section heading: accent caption with a hairline running to the edge. -->
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Opacity" Value="0.85"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="SectionRule" TargetType="Border">
+            <Setter Property="Grid.Column" Value="1"/>
+            <Setter Property="Height" Value="1"/>
+            <Setter Property="Margin" Value="10,0,0,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{StaticResource BorderBrush}"/>
+        </Style>
+
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextDimBrush}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Scrolls only when the screen is too short for the whole form (the
+             window is capped to the work area in code); the footer stays put. -->
+        <ScrollViewer x:Name="FormScroller" VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled" Focusable="False"
+                      ScrollChanged="FormScroller_ScrollChanged">
+            <StackPanel Margin="24,22,24,0">
+                <!-- ===== Header ===== -->
+                <Grid Margin="0,0,0,18">
+                    <TextBlock x:Name="HeaderText" Text="ADD FEED"
+                               Foreground="{StaticResource AccentBrush}"
+                               FontFamily="Consolas" FontSize="16" FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+                    <CheckBox x:Name="ActiveCheck" Style="{StaticResource NeonCheck}"
+                              Content="Active" IsChecked="True"
+                              HorizontalAlignment="Right" VerticalAlignment="Center"
+                              ToolTip="Untick to pause fetching and panels for this feed"/>
+                </Grid>
+
+                <!-- ===== Source ===== -->
+                <TextBlock Text="FEED URL" Style="{StaticResource FieldLabel}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="UrlBox" Style="{StaticResource NeonTextBox}" FontFamily="Consolas"
+                             TextChanged="UrlBox_TextChanged"/>
+                    <Button x:Name="TestButton" Grid.Column="1" Content="TEST" Style="{StaticResource NeonButton}"
+                            Margin="8,0,0,0" Padding="14,0" Click="Test_Click"
+                            ToolTip="Fetch the feed now and show what's in it"/>
+                </Grid>
+                <TextBlock Style="{StaticResource Hint}" Margin="0,5,0,0"
+                           Text="RSS, Atom or JSON Feed  ·  or just a news site's address: its feed is found automatically"/>
+                <TextBlock x:Name="TestResultText" FontSize="12" Margin="0,8,0,0" TextWrapping="Wrap"
+                           FontFamily="Consolas" Visibility="Collapsed"/>
+
+                <Grid Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="130"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="DISPLAY NAME" Style="{StaticResource FieldLabel}"/>
+                        <TextBox x:Name="NameBox" Style="{StaticResource NeonTextBox}" TextChanged="Preview_Changed"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="CHECK EVERY (MIN)" Style="{StaticResource FieldLabel}"/>
+                        <local:NumberBox x:Name="IntervalBox" Text="5" Minimum="1" Maximum="1440"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- ===== Filters ===== -->
+                <Grid Margin="0,20,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="FILTERS" Style="{StaticResource SectionTitle}"/>
+                    <Border Style="{StaticResource SectionRule}"/>
+                </Grid>
+
+                <TextBlock Text="ONLY STORIES MENTIONING" Style="{StaticResource FieldLabel}"/>
+                <TextBox x:Name="IncludeBox" Style="{StaticResource NeonTextBox}"/>
+                <TextBlock Text="SKIP STORIES MENTIONING" Style="{StaticResource FieldLabel}" Margin="0,10,0,4"/>
+                <TextBox x:Name="ExcludeBox" Style="{StaticResource NeonTextBox}"/>
+                <TextBlock Style="{StaticResource Hint}" Margin="0,5,0,0"
+                           Text="Comma-separated words or phrases, matched as whole words in the headline and summary. Blank = every story."/>
+
+                <!-- ===== Panel ===== -->
+                <Grid Margin="0,20,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="PANEL" Style="{StaticResource SectionTitle}"/>
+                    <Border Style="{StaticResource SectionRule}"/>
+                </Grid>
+
+                <CheckBox x:Name="SoundCheck" Style="{StaticResource NeonCheck}"
+                          Content="Play a subtle chime when this feed has new stories"
+                          IsChecked="True" Margin="0,0,0,12"/>
+
+                <TextBlock Text="PANEL COLOUR" Style="{StaticResource FieldLabel}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="ColorBox" Style="{StaticResource NeonTextBox}"
+                             FontFamily="Consolas" TextChanged="Preview_Changed"/>
+                    <TextBlock x:Name="ColorPlaceholder" Text="global" Style="{StaticResource Hint}"
+                               FontFamily="Consolas" FontSize="13" Margin="11,0,0,0"
+                               VerticalAlignment="Center" IsHitTestVisible="False"/>
+                    <Border Grid.Column="1" x:Name="ColorSwatch" Width="33" CornerRadius="3"
+                            Margin="6,0,0,0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                            Cursor="Hand" ToolTip="Click to pick any colour. Blank box = the colour from Settings."
+                            MouseLeftButtonUp="ColorSwatch_Click"/>
+                    <!-- Quick picks; filled in code. -->
+                    <WrapPanel x:Name="PresetPanel" Grid.Column="2" Margin="14,0,0,0" VerticalAlignment="Center"/>
+                </Grid>
+
+                <TextBlock Text="PREVIEW" Style="{StaticResource FieldLabel}" Margin="0,14,0,6"/>
+                <Border x:Name="PreviewTile" Background="{StaticResource PanelBrush}" BorderThickness="1"
+                        CornerRadius="5" Width="380" HorizontalAlignment="Left" Margin="0,0,0,4">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="4"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Rectangle x:Name="PreviewStripe" RadiusX="2" RadiusY="2"/>
+                        <StackPanel Grid.Column="1" Margin="14,11,14,12">
+                            <Grid>
+                                <TextBlock x:Name="PreviewFeed" FontFamily="Consolas" FontSize="12" FontWeight="Bold"
+                                           TextTrimming="CharacterEllipsis" Margin="0,0,70,0"/>
+                                <TextBlock x:Name="PreviewTime" Foreground="{StaticResource TextDimBrush}"
+                                           FontFamily="Consolas" FontSize="11" HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                            <TextBlock x:Name="PreviewTitle" Foreground="{StaticResource TextBrush}" FontSize="14.5"
+                                       FontWeight="SemiBold" Margin="0,5,0,0" TextWrapping="Wrap"
+                                       TextTrimming="WordEllipsis" LineHeight="19"
+                                       LineStackingStrategy="BlockLineHeight" MaxHeight="57"
+                                       Text="New stories pop up at the screen edge like this"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border x:Name="FooterBar" Grid.Row="1" Padding="24,0,24,24"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0">
+            <StackPanel>
+                <TextBlock x:Name="ErrorText" Foreground="{StaticResource OfflineBrush}"
+                           FontSize="12" Margin="0,14,0,0" TextWrapping="Wrap"
+                           Visibility="Collapsed"/>
+
+                <!-- ===== Footer ===== -->
+                <Grid Margin="0,22,0,0">
+                    <Button x:Name="RemoveButton" Content="REMOVE" Style="{StaticResource DangerButton}"
+                            HorizontalAlignment="Left" Click="Remove_Click" Visibility="Collapsed"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button x:Name="SaveButton" Content="SAVE" Style="{StaticResource NeonButton}"
+                                Click="Save_Click" IsDefault="True"/>
+                        <Button Content="CANCEL" Style="{StaticResource GhostButton}" Margin="10,0,0,0"
+                                Click="Cancel_Click" IsCancel="True"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

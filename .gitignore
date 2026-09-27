@@ -1,0 +1,15 @@
+# Build output
+bin/
+obj/
+dist/
+dist-arm64/
+
+# User/IDE files
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Logs and temp
+*.log
+release/

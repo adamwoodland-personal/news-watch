@@ -1,0 +1,136 @@
+<Window x:Class="NewsWatch.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:NewsWatch"
+        Title="Settings"
+        Width="480" SizeToContent="Height"
+        Background="{StaticResource BgBrush}"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        FontFamily="Segoe UI"
+        ShowInTaskbar="False">
+
+    <Window.Resources>
+        <Style x:Key="RowText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </Window.Resources>
+
+    <Border Padding="24">
+        <StackPanel>
+            <TextBlock Text="SETTINGS"
+                       Foreground="{StaticResource AccentBrush}"
+                       FontFamily="Consolas" FontSize="16" FontWeight="Bold"
+                       Margin="0,0,0,18"/>
+
+            <!-- Behaviour -->
+            <TextBlock Text="BEHAVIOUR" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+            <CheckBox x:Name="CloseToTrayCheck" Style="{StaticResource NeonCheck}"
+                      Content="Clicking X minimises to the tray instead of exiting"/>
+            <CheckBox x:Name="ConfirmExitCheck" Style="{StaticResource NeonCheck}"
+                      Content="Ask for confirmation before exiting" Margin="0,10,0,0"/>
+            <CheckBox x:Name="AutoStartCheck" Style="{StaticResource NeonCheck}"
+                      Content="Start automatically when I log in (minimised to tray)" Margin="0,10,0,0"/>
+
+            <!-- Panels -->
+            <Border Background="{StaticResource BorderBrush}" Height="1" Margin="0,18,0,14"/>
+            <TextBlock Text="PANELS" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="100"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="Panels appear on the side of the screen" Style="{StaticResource RowText}"/>
+                <ComboBox Grid.Row="0" Grid.Column="1" x:Name="SideCombo" Style="{StaticResource NeonCombo}"
+                          Height="{Binding ActualHeight, ElementName=DurationBox}"
+                          ToolTip="Left by default, clear of PULSE//WATCH's tiles on the right. The screen is the primary one, or --monitor N.">
+                    <ComboBoxItem Content="Left" IsSelected="True"/>
+                    <ComboBoxItem Content="Right"/>
+                </ComboBox>
+
+                <TextBlock Grid.Row="1" Text="Panel stays on screen for (seconds)" Style="{StaticResource RowText}" Margin="0,8,0,0"
+                           ToolTip="Hovering a panel holds it"/>
+                <local:NumberBox Grid.Row="1" Grid.Column="1" x:Name="DurationBox" Margin="0,8,0,0"
+                                 Minimum="1" Maximum="3600"/>
+
+                <TextBlock Grid.Row="2" Text="Most panels on screen at once" Style="{StaticResource RowText}" Margin="0,8,0,0"
+                           ToolTip="Older panels slide away to make room"/>
+                <local:NumberBox Grid.Row="2" Grid.Column="1" x:Name="MaxOnScreenBox" Margin="0,8,0,0"
+                                 Minimum="1" Maximum="20"/>
+
+                <TextBlock Grid.Row="3" Text="Most panels per feed per check" Style="{StaticResource RowText}" Margin="0,8,0,0"
+                           ToolTip="Any more become one '+N more' panel; all are in History"/>
+                <local:NumberBox Grid.Row="3" Grid.Column="1" x:Name="PerCheckBox" Margin="0,8,0,0"
+                                 Minimum="1" Maximum="20"/>
+
+                <TextBlock Grid.Row="4" Text="Catch-up after launch: panels per feed (0 = off)" Style="{StaticResource RowText}" Margin="0,8,0,0"
+                           ToolTip="Stories published while NEWS//WATCH was closed. The rest go to History."/>
+                <local:NumberBox Grid.Row="4" Grid.Column="1" x:Name="CatchUpBox" Margin="0,8,0,0"
+                                 Minimum="0" Maximum="20"/>
+
+                <TextBlock Grid.Row="5" Text="Ignore stories older than (hours, 0 = no limit)" Style="{StaticResource RowText}" Margin="0,8,0,0"
+                           ToolTip="Some feeds re-surface old items; this keeps them from popping up"/>
+                <local:NumberBox Grid.Row="5" Grid.Column="1" x:Name="MaxAgeBox" Margin="0,8,0,0"
+                                 Minimum="0" Maximum="720"/>
+            </Grid>
+
+            <CheckBox x:Name="SummaryCheck" Style="{StaticResource NeonCheck}"
+                      Content="Show the story summary under the headline" Margin="0,14,0,0"/>
+            <CheckBox x:Name="ImagesCheck" Style="{StaticResource NeonCheck}"
+                      Content="Show the story's thumbnail when the feed has one" Margin="0,10,0,0"/>
+
+            <!-- Colour -->
+            <Border Background="{StaticResource BorderBrush}" Height="1" Margin="0,18,0,14"/>
+            <TextBlock Text="DEFAULT PANEL COLOUR" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="34"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="ColorBox" Style="{StaticResource NeonTextBox}" FontFamily="Consolas"
+                         TextChanged="ColorBox_TextChanged"/>
+                <Border Grid.Column="1" x:Name="ColorSwatch"
+                        Width="26" Height="26" CornerRadius="3" Margin="8,0,0,0"
+                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                        Cursor="Hand" ToolTip="Click to pick a colour"
+                        MouseLeftButtonUp="ColorSwatch_Click"/>
+                <Button Grid.Column="2" Content="RESET" Style="{StaticResource NeonButton}"
+                        HorizontalAlignment="Right" VerticalAlignment="Center"
+                        Padding="10,5" Click="ResetColor_Click"/>
+            </Grid>
+            <TextBlock Text="For feeds without their own colour. Click the swatch to pick, or type hex."
+                       Foreground="{StaticResource TextDimBrush}" FontSize="11" Margin="0,6,0,0"/>
+
+            <!-- About -->
+            <Border Background="{StaticResource BorderBrush}" Height="1" Margin="0,18,0,14"/>
+            <TextBlock Text="ABOUT" Style="{StaticResource FieldLabel}" Margin="0,0,0,8"/>
+            <TextBlock x:Name="VersionText" Foreground="{StaticResource TextBrush}" FontSize="12"/>
+            <TextBlock Foreground="{StaticResource TextDimBrush}" FontSize="11" Margin="0,6,0,0"
+                       TextWrapping="Wrap"
+                       Text="MIT licence — free to use, modify and redistribute. Settings and feeds are stored together in settings.json (Config Folder link on the main screen) for easy backup or moving between machines; seen.json remembers which stories each feed has already shown."/>
+
+            <TextBlock x:Name="ErrorText" Foreground="{StaticResource OfflineBrush}"
+                       FontSize="12" Margin="0,14,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
+                <Button Content="SAVE" Style="{StaticResource NeonButton}"
+                        Click="Save_Click" IsDefault="True"/>
+                <Button Content="CANCEL" Style="{StaticResource GhostButton}" Margin="10,0,0,0"
+                        Click="Cancel_Click" IsCancel="True"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>
