@@ -58,7 +58,7 @@ The list shows each feed's status (`LIVE` / `ERROR` / `PENDING` / `PAUSED`), for
 
 - Panels slide in at the left edge of the chosen screen (or the right; see Settings), newest on top, in a small always-on-top overlay that exists only while panels are showing and is sized to them — nothing sits over your desktop or games the rest of the time. They appear even when the app is minimised and never steal focus.
 - Each panel shows the feed name in its colour, the story's time and age (`12:25 · 42 min ago`), the headline (up to three lines), the summary (two lines, optional) and the story's thumbnail when the feed has one (optional).
-- **Click a panel to dismiss it; right-click it to open the story** in your browser (and dismiss it). Hovering holds it on screen; moving away gives it 5 more seconds. Otherwise it leaves after the panel time (default 15 s). Stories that have gone are in History (double-click to open).
+- **Click a panel to dismiss it; right-click it to open the story** in your browser (and dismiss it). Settings can swap the two buttons. Hovering holds it on screen; moving away gives it 5 more seconds. Otherwise it leaves after the panel time (default 15 s). Stories that have gone are in History (double-click to open).
 - **Queue.** At most 5 panels are on screen at once (Settings). Further stories wait their turn instead of pushing unread panels off, and each slides in as a panel leaves; several at once come in one after another rather than all together. A `+N MORE WAITING` bar under the panels shows the queue; click it to skip them (they're in History). Up to 20 can wait (Settings); past that the longest-waiting is skipped. Holding panels, or pausing or removing a feed, drops its waiting panels too.
 - Tray icon: a cyan page when all active feeds are fine, red while any is failing; the tooltip shows the version and the failing count. Right-click for Open, History, Check all feeds now, Mute sounds, Hold panels (off / until re-enabled / 15 m / 30 m / 1 h / 2 h / 12 h — feeds are still checked and stories still go to History, only panels are held), Exit.
 - Minimising hides to the tray; with "X minimises to tray" on, closing does too.
@@ -99,7 +99,7 @@ The list shows each feed's status (`LIVE` / `ERROR` / `PENDING` / `PAUSED`), for
 
 ## Settings
 
-⚙ SETTINGS: X-minimises-to-tray, confirm-before-exit, auto-start at login (minimised); panel side (left by default), panel time, panels on screen, panels waiting in the queue, catch-up per feed, maximum story age, show summaries, show thumbnails; the default panel colour (with picker); version and licence.
+⚙ SETTINGS: X-minimises-to-tray, confirm-before-exit, auto-start at login (minimised); panel side (left by default), left-click to dismiss or open (right-click does the other), panel time, panels on screen, panels waiting in the queue, catch-up per feed, maximum story age, show summaries, show thumbnails; the default panel colour (with picker); version and licence.
 
 Everything — settings and feeds — lives in one JSON file, `%APPDATA%\NewsWatch\settings.json` by default (Config Folder link on the main screen) or whatever `--settings` points at, for easy backup or moving between machines. `seen.json` beside it remembers which stories each feed has produced (delete it and every feed's next check is silent again). Auto-start is the one setting kept in the registry instead, since it embeds the exe path.
 

@@ -21,6 +21,9 @@ public class AppSettings
     /// <summary>Left by default so panels don't collide with PULSE//WATCH's tiles on the right.</summary>
     public PanelSide PanelSide { get; set; } = PanelSide.Left;
 
+    /// <summary>False: left-click dismisses a panel, right-click opens its story. True: the other way round.</summary>
+    public bool ClickOpensStory { get; set; }
+
     public bool CloseToTray { get; set; } = false;
     public bool ConfirmOnExit { get; set; } = true;
     public bool MuteSounds { get; set; }

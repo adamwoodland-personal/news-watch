@@ -66,6 +66,9 @@ public partial class PanelOverlayWindow : Window
     // A burst (several stories in one check) slides in one at a time, not all at once.
     private readonly DispatcherTimer _pace = new() { Interval = TimeSpan.FromMilliseconds(450) };
 
+    /// <summary>Left-click opens the story and right-click dismisses, instead of the other way round. Read at click time.</summary>
+    public bool ClickOpensStory { get; set; }
+
     private int _maxOnScreen = 5;
 
     /// <summary>Beyond this many on screen, panels wait in the queue. Lowering it slides the oldest away.</summary>
@@ -380,7 +383,7 @@ public partial class PanelOverlayWindow : Window
             CornerRadius = new CornerRadius(5),
             Margin = new Thickness(0, 0, 0, 10),
             Cursor = Cursors.Hand,
-            ToolTip = link != null ? "Click to dismiss · right-click to open the story" : "Click to dismiss",
+            ToolTip = ClickTip(link),
             RenderTransform = new TranslateTransform(OffscreenX, 0),
             Opacity = 0,
             Effect = new DropShadowEffect { Color = accent, BlurRadius = 20, ShadowDepth = 0, Opacity = 0.45 }
@@ -399,15 +402,20 @@ public partial class PanelOverlayWindow : Window
         grid.Children.Add(padded);
         tile.Child = grid;
 
-        tile.MouseLeftButtonUp += (_, _) => DismissTile(tile, feedId);
-        // Right-click reads it: open the story (http/https only) and clear the panel.
+        // One button dismisses, the other opens the story (http/https only) and dismisses;
+        // which is which is a setting, so it's looked up at click time.
+        void Click(bool open)
+        {
+            if (open) ValidationHelpers.OpenInBrowser(link);
+            DismissTile(tile, feedId);
+        }
+        tile.MouseLeftButtonUp += (_, _) => Click(open: ClickOpensStory);
         tile.MouseRightButtonUp += (_, e) =>
         {
             e.Handled = true;
-            if (link == null) return;
-            ValidationHelpers.OpenInBrowser(link);
-            DismissTile(tile, feedId);
+            Click(open: !ClickOpensStory);
         };
+        tile.ToolTipOpening += (_, _) => tile.ToolTip = ClickTip(link); // follows a settings change
         PanelHost.Children.Insert(0, tile);
         if (!IsVisible) Show(); // ShowActivated=false + WS_EX_NOACTIVATE: never steals focus
 
@@ -439,6 +447,11 @@ public partial class PanelOverlayWindow : Window
         };
         tile.Unloaded += (_, _) => timer.Stop();
     }
+
+    private string ClickTip(string? link)
+        => link == null ? "Click to dismiss"
+            : ClickOpensStory ? "Click to open the story · right-click to dismiss"
+            : "Click to dismiss · right-click to open the story";
 
     /// <summary>Slide out the oldest (bottom) panels beyond MaxOnScreen.</summary>
     private void TrimToMax()

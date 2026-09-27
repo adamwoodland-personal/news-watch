@@ -260,6 +260,7 @@ public partial class MainWindow : Window
     private void ApplyOverlaySettings()
     {
         _overlay.OnLeft = _settings.PanelSide == PanelSide.Left;
+        _overlay.ClickOpensStory = _settings.ClickOpensStory;
         _overlay.MaxOnScreen = _settings.MaxPanelsOnScreen;
         _overlay.MaxQueued = _settings.MaxQueuedPanels;
     }

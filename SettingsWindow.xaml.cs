@@ -22,6 +22,7 @@ public partial class SettingsWindow : Window
         ConfirmExitCheck.IsChecked = settings.ConfirmOnExit;
         AutoStartCheck.IsChecked = StartupService.IsEnabled();
         SideCombo.SelectedIndex = settings.PanelSide == PanelSide.Right ? 1 : 0;
+        ClickCombo.SelectedIndex = settings.ClickOpensStory ? 1 : 0;
         DurationBox.Text = settings.PanelDurationSeconds.ToString();
         MaxOnScreenBox.Text = settings.MaxPanelsOnScreen.ToString();
         QueueBox.Text = settings.MaxQueuedPanels.ToString();
@@ -82,6 +83,7 @@ public partial class SettingsWindow : Window
         _settings.CloseToTray = CloseToTrayCheck.IsChecked == true;
         _settings.ConfirmOnExit = ConfirmExitCheck.IsChecked == true;
         _settings.PanelSide = SideCombo.SelectedIndex == 1 ? PanelSide.Right : PanelSide.Left;
+        _settings.ClickOpensStory = ClickCombo.SelectedIndex == 1;
         _settings.PanelDurationSeconds = secs;
         _settings.MaxPanelsOnScreen = onScreen;
         _settings.MaxQueuedPanels = queue;

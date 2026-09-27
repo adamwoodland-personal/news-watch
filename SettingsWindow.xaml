@@ -50,6 +50,7 @@
                     <RowDefinition/>
                     <RowDefinition/>
                     <RowDefinition/>
+                    <RowDefinition/>
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Text="Panels appear on the side of the screen" Style="{StaticResource RowText}"/>
@@ -60,29 +61,38 @@
                     <ComboBoxItem Content="Right"/>
                 </ComboBox>
 
-                <TextBlock Grid.Row="1" Text="Panel stays on screen for (seconds)" Style="{StaticResource RowText}" Margin="0,8,0,0"
+                <TextBlock Grid.Row="1" Text="Left-click a panel to" Style="{StaticResource RowText}" Margin="0,8,0,0"
+                           ToolTip="Right-click does the other one"/>
+                <ComboBox Grid.Row="1" Grid.Column="1" x:Name="ClickCombo" Style="{StaticResource NeonCombo}" Margin="0,8,0,0"
+                          Height="{Binding ActualHeight, ElementName=DurationBox}"
+                          ToolTip="Right-click does the other one. Opening a story also dismisses its panel.">
+                    <ComboBoxItem Content="Dismiss" IsSelected="True"/>
+                    <ComboBoxItem Content="Open"/>
+                </ComboBox>
+
+                <TextBlock Grid.Row="2" Text="Panel stays on screen for (seconds)" Style="{StaticResource RowText}" Margin="0,8,0,0"
                            ToolTip="Hovering a panel holds it"/>
-                <local:NumberBox Grid.Row="1" Grid.Column="1" x:Name="DurationBox" Margin="0,8,0,0"
+                <local:NumberBox Grid.Row="2" Grid.Column="1" x:Name="DurationBox" Margin="0,8,0,0"
                                  Minimum="1" Maximum="3600"/>
 
-                <TextBlock Grid.Row="2" Text="Most panels on screen at once" Style="{StaticResource RowText}" Margin="0,8,0,0"
+                <TextBlock Grid.Row="3" Text="Most panels on screen at once" Style="{StaticResource RowText}" Margin="0,8,0,0"
                            ToolTip="Further panels wait their turn and slide in as others leave"/>
-                <local:NumberBox Grid.Row="2" Grid.Column="1" x:Name="MaxOnScreenBox" Margin="0,8,0,0"
+                <local:NumberBox Grid.Row="3" Grid.Column="1" x:Name="MaxOnScreenBox" Margin="0,8,0,0"
                                  Minimum="1" Maximum="20"/>
 
-                <TextBlock Grid.Row="3" Text="Most panels waiting their turn (0 = none)" Style="{StaticResource RowText}" Margin="0,8,0,0"
+                <TextBlock Grid.Row="4" Text="Most panels waiting their turn (0 = none)" Style="{StaticResource RowText}" Margin="0,8,0,0"
                            ToolTip="When the screen is full, new panels queue up. Past this many, the oldest waiting story is skipped. All stories are in History."/>
-                <local:NumberBox Grid.Row="3" Grid.Column="1" x:Name="QueueBox" Margin="0,8,0,0"
+                <local:NumberBox Grid.Row="4" Grid.Column="1" x:Name="QueueBox" Margin="0,8,0,0"
                                  Minimum="0" Maximum="100"/>
 
-                <TextBlock Grid.Row="4" Text="Catch-up after launch: panels per feed (0 = off)" Style="{StaticResource RowText}" Margin="0,8,0,0"
+                <TextBlock Grid.Row="5" Text="Catch-up after launch: panels per feed (0 = off)" Style="{StaticResource RowText}" Margin="0,8,0,0"
                            ToolTip="Stories published while NEWS//WATCH was closed. The rest go to History."/>
-                <local:NumberBox Grid.Row="4" Grid.Column="1" x:Name="CatchUpBox" Margin="0,8,0,0"
+                <local:NumberBox Grid.Row="5" Grid.Column="1" x:Name="CatchUpBox" Margin="0,8,0,0"
                                  Minimum="0" Maximum="20"/>
 
-                <TextBlock Grid.Row="5" Text="Ignore stories older than (hours, 0 = no limit)" Style="{StaticResource RowText}" Margin="0,8,0,0"
+                <TextBlock Grid.Row="6" Text="Ignore stories older than (hours, 0 = no limit)" Style="{StaticResource RowText}" Margin="0,8,0,0"
                            ToolTip="Some feeds re-surface old items; this keeps them from popping up"/>
-                <local:NumberBox Grid.Row="5" Grid.Column="1" x:Name="MaxAgeBox" Margin="0,8,0,0"
+                <local:NumberBox Grid.Row="6" Grid.Column="1" x:Name="MaxAgeBox" Margin="0,8,0,0"
                                  Minimum="0" Maximum="720"/>
             </Grid>
 
