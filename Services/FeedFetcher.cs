@@ -23,6 +23,9 @@ public sealed class FetchResult
     /// <summary>Short failure code for the feed list (TIMEOUT, DNS, HTTP 404, NOT A FEED, ...).</summary>
     public string? Error { get; init; }
 
+    /// <summary>A network-level failure (no answer, no route, dropped) worth retrying soon, as opposed to what the server said.</summary>
+    public bool Transient { get; init; }
+
     /// <summary>Set when the URL was a web page and a feed was found through its &lt;link rel="alternate"&gt;.</summary>
     public string? DiscoveredUrl { get; init; }
 
@@ -52,7 +55,8 @@ public static partial class FeedFetcher
             AllowAutoRedirect = true,
             MaxAutomaticRedirections = 8,
             PooledConnectionLifetime = TimeSpan.FromMinutes(5), // pick up DNS changes
-            ConnectTimeout = TimeSpan.FromSeconds(10)
+            ConnectTimeout = TimeSpan.FromSeconds(10),
+            ConnectCallback = ConnectAsync
         };
         if (publicOnly)
         {
@@ -94,15 +98,15 @@ public static partial class FeedFetcher
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
         {
-            return Fail("TIMEOUT");
+            return Fail("TIMEOUT", transient: true);
         }
         catch (HttpRequestException ex)
         {
-            return Fail(Classify(ex));
+            return Fail(Classify(ex), transient: ex.StatusCode == null);
         }
         catch (IOException)
         {
-            return Fail("CONN LOST");
+            return Fail("CONN LOST", transient: true);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -110,7 +114,8 @@ public static partial class FeedFetcher
         }
     }
 
-    private static FetchResult Fail(string code) => new() { Outcome = FetchOutcome.Error, Error = code };
+    private static FetchResult Fail(string code, bool transient = false)
+        => new() { Outcome = FetchOutcome.Error, Error = code, Transient = transient };
 
     private sealed class RawResult
     {
@@ -202,6 +207,14 @@ public static partial class FeedFetcher
     private static bool IsIntranetHost(Uri uri)
         => uri.IsLoopback || uri.HostNameType == UriHostNameType.Dns && !uri.Host.TrimEnd('.').Contains('.');
 
+    /// <summary>Races IPv6 and IPv4 so one broken family can't stall every fetch (see <see cref="HappyEyeballs"/>).</summary>
+    private static async ValueTask<Stream> ConnectAsync(SocketsHttpConnectionContext context, CancellationToken token)
+    {
+        var addresses = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, token).ConfigureAwait(false);
+        var socket = await HappyEyeballs.ConnectAsync(addresses, context.DnsEndPoint.Port, token).ConfigureAwait(false);
+        return new NetworkStream(socket, ownsSocket: true);
+    }
+
     /// <summary>
     /// Connects only to public addresses: a feed shouldn't be able to make this
     /// PC send requests into its own network (router, NAS, cloud metadata) just
@@ -215,17 +228,8 @@ public static partial class FeedFetcher
         if (allowed.Length == 0)
             throw new HttpRequestException($"{context.DnsEndPoint.Host} is not a public address");
 
-        var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
-        try
-        {
-            await socket.ConnectAsync(allowed, context.DnsEndPoint.Port, token).ConfigureAwait(false);
-            return new NetworkStream(socket, ownsSocket: true);
-        }
-        catch
-        {
-            socket.Dispose();
-            throw;
-        }
+        var socket = await HappyEyeballs.ConnectAsync(allowed, context.DnsEndPoint.Port, token).ConfigureAwait(false);
+        return new NetworkStream(socket, ownsSocket: true);
     }
 
     /// <summary>False for loopback, private (RFC 1918 / ULA), link-local, CGNAT, multicast and reserved ranges.</summary>

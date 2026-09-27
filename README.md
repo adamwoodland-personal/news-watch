@@ -75,6 +75,8 @@ The list shows each feed's status (`LIVE` / `ERROR` / `PENDING` / `PAUSED`), for
 
 - One loop per active feed, each starting at a random 0.3–4 s offset so feeds don't all fetch in one burst.
 - **Polite:** conditional GET (`If-None-Match` / `If-Modified-Since`), so an unchanged feed costs a `304 Not Modified` and no download. gzip/deflate/brotli accepted. Connections are reused across feeds on the same host. Uses the system proxy.
+- **Dual-stack like a browser:** IPv6 and IPv4 addresses are raced (Happy Eyeballs, 250 ms head start each), so a network where one family is silently broken — phone tethering, flaky ISP IPv6 — doesn't turn every check into a `TIMEOUT`.
+- **Recovers quickly:** after a network failure (`TIMEOUT`, `DNS`, `UNREACH` …) a feed retries at 15 s, 30 s, 60 s … instead of waiting out its interval, and retries straight away when Windows reports a network change (new Wi-Fi, cable plugged in, waking from sleep). Server errors (`HTTP 404`, `HTTP 503` …) wait for the normal interval.
 - **Bounded:** 20 s timeout per fetch, 8 MB cap per feed, 3 MB / 10 s per thumbnail. Thumbnails are downloaded only when a panel shows one.
 - **Tolerant parsing:** elements are matched by local name, so feeds with missing or wrong namespaces still parse. HTML entities that XML doesn't define (`&nbsp;`, `&mdash;` …) are repaired, legacy encodings (windows-1252, ISO-8859-x) work, and RFC 822 dates with zone names (`EDT`, `BST` …) are understood. Headlines and summaries are reduced to plain text; a summary that only repeats the headline (Google News) is dropped.
 - **Safe parsing:** DTDs and external entities are never processed (no XXE), and only absolute `http`/`https` links and images are used.

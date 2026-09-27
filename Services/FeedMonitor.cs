@@ -1,3 +1,4 @@
+using System.Net.NetworkInformation;
 using NewsWatch.Models;
 
 namespace NewsWatch.Services;
@@ -21,12 +22,43 @@ public class FeedMonitor : IDisposable
     {
         public readonly CancellationTokenSource Cts = new();
         public readonly SemaphoreSlim Wake = new(0, 1);
+
+        /// <summary>Last fetch hit a network-level failure; a network change retries it at once.</summary>
+        public volatile bool Offline;
     }
+
+    // After a network-level failure, retry at 15 s, 30 s, 60 s ... (never later than the
+    // feed's own interval) so a feed comes back soon after the connection does.
+    private static readonly TimeSpan FirstRetry = TimeSpan.FromSeconds(15);
+
+    // Windows raises several address changes per switch (Wi-Fi join, DHCP, IPv6 RAs);
+    // wait for them to settle so the retry runs on the new network, and once.
+    private static readonly TimeSpan NetworkSettle = TimeSpan.FromSeconds(4);
 
     private readonly object _gate = new();
     private readonly Dictionary<Guid, Loop> _loops = new();
+    private readonly System.Threading.Timer _networkSettle;
 
     public event EventHandler<FetchCompletedEventArgs>? FetchCompleted;
+
+    public FeedMonitor()
+    {
+        _networkSettle = new System.Threading.Timer(_ => RetryOffline());
+        NetworkChange.NetworkAddressChanged += OnNetworkChanged;
+        NetworkChange.NetworkAvailabilityChanged += OnNetworkChanged;
+    }
+
+    private void OnNetworkChanged(object? sender, EventArgs e)
+        => _networkSettle.Change(NetworkSettle, Timeout.InfiniteTimeSpan);
+
+    private void RetryOffline()
+    {
+        lock (_gate)
+        {
+            foreach (var loop in _loops.Values)
+                if (loop.Offline && loop.Wake.CurrentCount == 0) loop.Wake.Release();
+        }
+    }
 
     public void Start(FeedEntry feed)
     {
@@ -112,8 +144,10 @@ public class FeedMonitor : IDisposable
         var url = feed.Url;
         var interval = TimeSpan.FromSeconds(Math.Max(60, feed.IntervalSeconds));
 
+        var failures = 0;
         while (!token.IsCancellationRequested)
         {
+            var wait = interval;
             try
             {
                 // FetchAsync parses on the thread pool; this continuation is back on the
@@ -126,6 +160,15 @@ public class FeedMonitor : IDisposable
                     feed.ETag = result.ETag;
                     feed.LastModified = result.LastModified;
                 }
+
+                // Only network failures retry early: a server saying 404 or 503 is asked again on schedule.
+                loop.Offline = result.Transient;
+                failures = result.Transient ? failures + 1 : 0;
+                if (failures > 0)
+                {
+                    var backoff = FirstRetry * Math.Pow(2, Math.Min(failures - 1, 10));
+                    if (backoff < interval) wait = backoff;
+                }
                 Publish(feed, result, token);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -134,12 +177,20 @@ public class FeedMonitor : IDisposable
                 Publish(feed, new FetchResult { Outcome = FetchOutcome.Error, Error = "APP ERROR" }, token);
             }
 
-            await loop.Wake.WaitAsync(interval, token); // CheckNow releases it early
+            // CheckNow or a network change releases it early; start the backoff over after either.
+            if (await loop.Wake.WaitAsync(wait, token)) failures = 0;
         }
     }
 
     private void Publish(FeedEntry feed, FetchResult result, CancellationToken token)
         => FetchCompleted?.Invoke(this, new FetchCompletedEventArgs { Feed = feed, Result = result, Token = token });
 
-    public void Dispose() => StopAll();
+    public void Dispose()
+    {
+        // Static events: unhook, or they keep this monitor (and its loops' feeds) alive.
+        NetworkChange.NetworkAddressChanged -= OnNetworkChanged;
+        NetworkChange.NetworkAvailabilityChanged -= OnNetworkChanged;
+        _networkSettle.Dispose();
+        StopAll();
+    }
 }
