@@ -188,7 +188,7 @@ public partial class PanelOverlayWindow : Window
         {
             FeedId = feedId,
             Log = log,
-            Show = () => AddTile(feedId, accent, StoryBody(feedName, item, accent, showSummary, showImage), durationSeconds)
+            Show = () => AddTile(feedId, accent, StoryBody(feedName, item, accent, showSummary, showImage), durationSeconds, item.Link)
         });
         Pump();
         TrimQueue();
@@ -363,7 +363,7 @@ public partial class PanelOverlayWindow : Window
         }
     }
 
-    private void AddTile(Guid feedId, Color accent, UIElement body, int durationSeconds)
+    private void AddTile(Guid feedId, Color accent, UIElement body, int durationSeconds, string? link)
     {
         // Topmost can be silently lost (another topmost window asserting itself,
         // Explorer restart, resume from sleep) — re-assert it for every panel.
@@ -380,7 +380,7 @@ public partial class PanelOverlayWindow : Window
             CornerRadius = new CornerRadius(5),
             Margin = new Thickness(0, 0, 0, 10),
             Cursor = Cursors.Hand,
-            ToolTip = "Click to dismiss",
+            ToolTip = link != null ? "Click to dismiss · right-click to open the story" : "Click to dismiss",
             RenderTransform = new TranslateTransform(OffscreenX, 0),
             Opacity = 0,
             Effect = new DropShadowEffect { Color = accent, BlurRadius = 20, ShadowDepth = 0, Opacity = 0.45 }
@@ -400,6 +400,14 @@ public partial class PanelOverlayWindow : Window
         tile.Child = grid;
 
         tile.MouseLeftButtonUp += (_, _) => DismissTile(tile, feedId);
+        // Right-click reads it: open the story (http/https only) and clear the panel.
+        tile.MouseRightButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            if (link == null) return;
+            ValidationHelpers.OpenInBrowser(link);
+            DismissTile(tile, feedId);
+        };
         PanelHost.Children.Insert(0, tile);
         if (!IsVisible) Show(); // ShowActivated=false + WS_EX_NOACTIVATE: never steals focus
 
