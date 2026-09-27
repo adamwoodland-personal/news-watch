@@ -52,8 +52,47 @@ public partial class PanelOverlayWindow : Window
     private readonly Dictionary<Guid, List<Border>> _feedTiles = new();
     private readonly HashSet<Border> _leaving = new();
 
-    /// <summary>Oldest panels slide out to keep at most this many on screen.</summary>
-    public int MaxOnScreen { get; set; } = 5;
+    /// <summary>A story waiting for room on screen. Its panel is built when shown, so "3 min ago" is current.</summary>
+    private sealed class Pending
+    {
+        public required Guid FeedId { get; init; }
+        public required Action Show { get; init; }
+        public StoryEvent? Log { get; init; }
+    }
+
+    // Oldest first. New panels wait here instead of pushing older ones off before they've been read.
+    private readonly List<Pending> _queue = new();
+
+    // A burst (several stories in one check) slides in one at a time, not all at once.
+    private readonly DispatcherTimer _pace = new() { Interval = TimeSpan.FromMilliseconds(450) };
+
+    private int _maxOnScreen = 5;
+
+    /// <summary>Beyond this many on screen, panels wait in the queue. Lowering it slides the oldest away.</summary>
+    public int MaxOnScreen
+    {
+        get => _maxOnScreen;
+        set
+        {
+            _maxOnScreen = value;
+            TrimToMax();
+            Pump();
+        }
+    }
+
+    private int _maxQueued = 20;
+
+    /// <summary>Most panels waiting for room; past it the oldest waiting story is skipped.</summary>
+    public int MaxQueued
+    {
+        get => _maxQueued;
+        set
+        {
+            _maxQueued = value;
+            TrimQueue();
+            UpdateQueueChip();
+        }
+    }
 
     private const double StripWidth = 420;
     private bool _onLeft = true;
@@ -68,8 +107,8 @@ public partial class PanelOverlayWindow : Window
             _onLeft = value;
             // 16 px to the screen edge, the rest of the strip on the inner
             // side leaves room for the panels' glow.
-            PanelHost.HorizontalAlignment = value ? System.Windows.HorizontalAlignment.Left : System.Windows.HorizontalAlignment.Right;
-            PanelHost.Margin = value ? new Thickness(16, 16, 0, 16) : new Thickness(0, 16, 16, 16);
+            Column.HorizontalAlignment = value ? System.Windows.HorizontalAlignment.Left : System.Windows.HorizontalAlignment.Right;
+            Column.Margin = value ? new Thickness(16, 16, 0, 16) : new Thickness(0, 16, 16, 16);
             PositionOnScreen();
         }
     }
@@ -80,6 +119,11 @@ public partial class PanelOverlayWindow : Window
     public PanelOverlayWindow()
     {
         InitializeComponent();
+        _pace.Tick += (_, _) =>
+        {
+            _pace.Stop();
+            Pump();
+        };
         PositionOnScreen();
         SystemParameters.StaticPropertyChanged += (_, e) =>
         {
@@ -130,10 +174,78 @@ public partial class PanelOverlayWindow : Window
 
     // ===== Panels =====
 
-    public void ShowStory(FeedEntry feed, FeedItem item, Color accent, int durationSeconds, bool showSummary, bool showImage)
+    /// <summary>
+    /// Queue a story's panel: it slides in now if there's room, otherwise once a panel
+    /// leaves. <paramref name="log"/>'s Shown follows it (QUEUED, then PANEL or SKIPPED).
+    /// </summary>
+    public void ShowStory(FeedEntry feed, FeedItem item, Color accent, int durationSeconds,
+        bool showSummary, bool showImage, StoryEvent? log = null)
+    {
+        var feedId = feed.Id;
+        var feedName = feed.Name;
+        if (log != null) log.Shown = "QUEUED";
+        _queue.Add(new Pending
+        {
+            FeedId = feedId,
+            Log = log,
+            Show = () => AddTile(feedId, accent, StoryBody(feedName, item, accent, showSummary, showImage), durationSeconds)
+        });
+        Pump();
+        TrimQueue();
+        UpdateQueueChip();
+    }
+
+    /// <summary>Show the next waiting panel if there's room; the one after follows at least a beat later.</summary>
+    private void Pump()
+    {
+        if (!_pace.IsEnabled && _queue.Count > 0 && LiveCount() < MaxOnScreen)
+        {
+            var next = _queue[0];
+            _queue.RemoveAt(0);
+            if (next.Log != null) next.Log.Shown = "PANEL";
+            next.Show();
+            _pace.Start(); // the rest of a batch is usually still being queued: keep a gap regardless
+        }
+        UpdateQueueChip();
+    }
+
+    private int LiveCount() => PanelHost.Children.OfType<Border>().Count(t => !_leaving.Contains(t));
+
+    /// <summary>Skip the oldest waiting stories past MaxQueued; ones about to fill free slots don't count as waiting.</summary>
+    private void TrimQueue()
+    {
+        var freeSlots = Math.Max(0, MaxOnScreen - LiveCount());
+        while (_queue.Count > MaxQueued + freeSlots)
+        {
+            if (_queue[0].Log is { } log) log.Shown = "SKIPPED";
+            _queue.RemoveAt(0);
+        }
+    }
+
+    /// <summary>Drop every waiting panel, marking its story in History (SKIPPED, HELD ...).</summary>
+    public void ClearQueue(string status)
+    {
+        foreach (var pending in _queue)
+            if (pending.Log != null) pending.Log.Shown = status;
+        _queue.Clear();
+        UpdateQueueChip();
+    }
+
+    private void QueueChip_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => ClearQueue("SKIPPED");
+
+    private void UpdateQueueChip()
+    {
+        // Stories about to slide into free slots aren't "waiting" as far as the reader is concerned.
+        var waiting = _queue.Count - Math.Max(0, MaxOnScreen - LiveCount());
+        QueueChip.Visibility = waiting > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (waiting > 0)
+            QueueText.Text = $"+{waiting} MORE WAITING";
+    }
+
+    private UIElement StoryBody(string feedName, FeedItem item, Color accent, bool showSummary, bool showImage)
     {
         var content = new StackPanel();
-        content.Children.Add(HeaderRow(feed.Name, accent, StoryTimeText(item.Published)));
+        content.Children.Add(HeaderRow(feedName, accent, StoryTimeText(item.Published)));
         content.Children.Add(new TextBlock
         {
             Text = item.Title,
@@ -185,31 +297,7 @@ public partial class PanelOverlayWindow : Window
             _ = LoadThumbnailAsync(thumb, item.ImageUrl);
             body = grid;
         }
-
-        AddTile(feed.Id, accent, body, durationSeconds);
-    }
-
-    /// <summary>One panel standing in for the stories over the per-check cap.</summary>
-    public void ShowOverflow(FeedEntry feed, int count, Color accent, int durationSeconds)
-    {
-        var content = new StackPanel();
-        content.Children.Add(HeaderRow(feed.Name, accent, DateTime.Now.ToString("HH:mm")));
-        content.Children.Add(new TextBlock
-        {
-            Text = $"+{count} more new {(count == 1 ? "story" : "stories")}",
-            Foreground = TextBrush,
-            FontSize = 14.5,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 5, 0, 0)
-        });
-        content.Children.Add(new TextBlock
-        {
-            Text = "All of them are listed in HISTORY.",
-            Foreground = TextDimBrush,
-            FontSize = 12,
-            Margin = new Thickness(0, 3, 0, 0)
-        });
-        AddTile(feed.Id, accent, content, durationSeconds);
+        return body;
     }
 
     private static Grid HeaderRow(string feedName, Color accent, string right)
@@ -342,8 +430,6 @@ public partial class PanelOverlayWindow : Window
             timer.Start();
         };
         tile.Unloaded += (_, _) => timer.Stop();
-
-        TrimToMax();
     }
 
     /// <summary>Slide out the oldest (bottom) panels beyond MaxOnScreen.</summary>
@@ -354,9 +440,16 @@ public partial class PanelOverlayWindow : Window
             DismissTile(live[i]);
     }
 
-    /// <summary>Remove all panels for a feed (feed removed or paused).</summary>
+    /// <summary>Remove all panels for a feed, waiting ones included (feed removed or paused).</summary>
     public void DismissTilesFor(Guid feedId)
     {
+        foreach (var pending in _queue.Where(p => p.FeedId == feedId).ToList())
+        {
+            if (pending.Log != null) pending.Log.Shown = "SKIPPED";
+            _queue.Remove(pending);
+        }
+        UpdateQueueChip();
+
         if (_feedTiles.Remove(feedId, out var tiles))
             foreach (var tile in tiles.ToList())
                 DismissTile(tile);
@@ -384,6 +477,8 @@ public partial class PanelOverlayWindow : Window
         };
         tile.RenderTransform.BeginAnimation(TranslateTransform.XProperty, slideOut);
         tile.BeginAnimation(OpacityProperty, fadeOut);
+
+        Pump(); // its slot is free: the next waiting panel slides in as this one slides out
     }
 
     private static SolidColorBrush Frozen(Color color)

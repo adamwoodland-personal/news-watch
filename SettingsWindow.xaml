@@ -66,14 +66,14 @@
                                  Minimum="1" Maximum="3600"/>
 
                 <TextBlock Grid.Row="2" Text="Most panels on screen at once" Style="{StaticResource RowText}" Margin="0,8,0,0"
-                           ToolTip="Older panels slide away to make room"/>
+                           ToolTip="Further panels wait their turn and slide in as others leave"/>
                 <local:NumberBox Grid.Row="2" Grid.Column="1" x:Name="MaxOnScreenBox" Margin="0,8,0,0"
                                  Minimum="1" Maximum="20"/>
 
-                <TextBlock Grid.Row="3" Text="Most panels per feed per check" Style="{StaticResource RowText}" Margin="0,8,0,0"
-                           ToolTip="Any more become one '+N more' panel; all are in History"/>
-                <local:NumberBox Grid.Row="3" Grid.Column="1" x:Name="PerCheckBox" Margin="0,8,0,0"
-                                 Minimum="1" Maximum="20"/>
+                <TextBlock Grid.Row="3" Text="Most panels waiting their turn (0 = none)" Style="{StaticResource RowText}" Margin="0,8,0,0"
+                           ToolTip="When the screen is full, new panels queue up. Past this many, the oldest waiting story is skipped. All stories are in History."/>
+                <local:NumberBox Grid.Row="3" Grid.Column="1" x:Name="QueueBox" Margin="0,8,0,0"
+                                 Minimum="0" Maximum="100"/>
 
                 <TextBlock Grid.Row="4" Text="Catch-up after launch: panels per feed (0 = off)" Style="{StaticResource RowText}" Margin="0,8,0,0"
                            ToolTip="Stories published while NEWS//WATCH was closed. The rest go to History."/>

@@ -26,11 +26,11 @@ public class AppSettings
     public bool MuteSounds { get; set; }
     public string PanelColor { get; set; } = DefaultPanelColor;
 
-    /// <summary>Oldest panels make way beyond this many on screen.</summary>
+    /// <summary>Beyond this many on screen, new panels wait in a queue until one leaves.</summary>
     public int MaxPanelsOnScreen { get; set; } = 5;
 
-    /// <summary>Per feed per check; the rest are summed up in one "+N more" panel (and all go to History).</summary>
-    public int MaxPanelsPerCheck { get; set; } = 4;
+    /// <summary>Most panels waiting for room; past it the oldest waiting story is skipped (it stays in History).</summary>
+    public int MaxQueuedPanels { get; set; } = 20;
 
     /// <summary>Stories published while the app was closed: panels per feed on the first check after launch. 0 = none.</summary>
     public int CatchUpPerFeed { get; set; } = 3;
@@ -155,7 +155,7 @@ public static class SettingsService
         if (!Enum.IsDefined(s.PanelSide)) s.PanelSide = PanelSide.Left; // e.g. a hand-edited number
         if (ValidationHelpers.ParseColor(s.PanelColor ?? "") == null) s.PanelColor = AppSettings.DefaultPanelColor;
         s.MaxPanelsOnScreen = Math.Clamp(s.MaxPanelsOnScreen, 1, 20);
-        s.MaxPanelsPerCheck = Math.Clamp(s.MaxPanelsPerCheck, 1, 20);
+        s.MaxQueuedPanels = Math.Clamp(s.MaxQueuedPanels, 0, 100);
         s.CatchUpPerFeed = Math.Clamp(s.CatchUpPerFeed, 0, 20);
         s.MaxStoryAgeHours = Math.Clamp(s.MaxStoryAgeHours, 0, 24 * 30);
 

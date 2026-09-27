@@ -24,7 +24,7 @@ public partial class SettingsWindow : Window
         SideCombo.SelectedIndex = settings.PanelSide == PanelSide.Right ? 1 : 0;
         DurationBox.Text = settings.PanelDurationSeconds.ToString();
         MaxOnScreenBox.Text = settings.MaxPanelsOnScreen.ToString();
-        PerCheckBox.Text = settings.MaxPanelsPerCheck.ToString();
+        QueueBox.Text = settings.MaxQueuedPanels.ToString();
         CatchUpBox.Text = settings.CatchUpPerFeed.ToString();
         MaxAgeBox.Text = settings.MaxStoryAgeHours.ToString();
         SummaryCheck.IsChecked = settings.ShowSummary;
@@ -57,7 +57,7 @@ public partial class SettingsWindow : Window
     {
         if (!TryRange(DurationBox, 1, 3600, out var secs)) { ShowError("Panel time must be between 1 and 3600 seconds."); return; }
         if (!TryRange(MaxOnScreenBox, 1, 20, out var onScreen)) { ShowError("Panels on screen must be between 1 and 20."); return; }
-        if (!TryRange(PerCheckBox, 1, 20, out var perCheck)) { ShowError("Panels per check must be between 1 and 20."); return; }
+        if (!TryRange(QueueBox, 0, 100, out var queue)) { ShowError("Waiting panels must be between 0 and 100."); return; }
         if (!TryRange(CatchUpBox, 0, 20, out var catchUp)) { ShowError("Catch-up must be between 0 and 20."); return; }
         if (!TryRange(MaxAgeBox, 0, 720, out var maxAge)) { ShowError("Story age limit must be between 0 and 720 hours."); return; }
         if (ValidationHelpers.ParseColor(ColorBox.Text) == null)
@@ -84,7 +84,7 @@ public partial class SettingsWindow : Window
         _settings.PanelSide = SideCombo.SelectedIndex == 1 ? PanelSide.Right : PanelSide.Left;
         _settings.PanelDurationSeconds = secs;
         _settings.MaxPanelsOnScreen = onScreen;
-        _settings.MaxPanelsPerCheck = perCheck;
+        _settings.MaxQueuedPanels = queue;
         _settings.CatchUpPerFeed = catchUp;
         _settings.MaxStoryAgeHours = maxAge;
         _settings.ShowSummary = SummaryCheck.IsChecked == true;

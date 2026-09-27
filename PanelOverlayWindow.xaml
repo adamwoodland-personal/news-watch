@@ -17,7 +17,27 @@
          none: a permanent full-height strip, even fully transparent, swallows
          mouse input in DirectX games running maximised-windowed. -->
     <ScrollViewer VerticalScrollBarVisibility="Hidden" Focusable="False">
-        <StackPanel x:Name="PanelHost" Width="380" Margin="16,16,0,16"
-                    HorizontalAlignment="Left" VerticalAlignment="Top"/>
+        <StackPanel x:Name="Column" Width="380" Margin="16,16,0,16"
+                    HorizontalAlignment="Left" VerticalAlignment="Top">
+            <StackPanel x:Name="PanelHost"/>
+
+            <!-- Shown while panels are waiting for room; click to skip them. -->
+            <Border x:Name="QueueChip" Visibility="Collapsed" Cursor="Hand"
+                    Background="#101726" BorderBrush="#26324A" BorderThickness="1" CornerRadius="5"
+                    Padding="12,6" ToolTipService.InitialShowDelay="800"
+                    ToolTip="These slide in as panels leave. Click to skip them; every story is in History."
+                    MouseLeftButtonUp="QueueChip_Click">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="QueueText" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                               Foreground="#D6E2F0"/>
+                    <TextBlock Grid.Column="1" Text="SKIP" FontFamily="Consolas" FontSize="11" FontWeight="Bold"
+                               Foreground="#00E5FF"/>
+                </Grid>
+            </Border>
+        </StackPanel>
     </ScrollViewer>
 </Window>

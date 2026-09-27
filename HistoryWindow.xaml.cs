@@ -26,15 +26,19 @@ public partial class HistoryWindow : Window
         StoryList.SelectionChanged += (_, _) =>
             OpenButton.IsEnabled = (StoryList.SelectedItem as StoryEvent)?.HasLink == true;
         log.Events.CollectionChanged += OnEventsChanged;
+        log.StatusChanged += OnStatusChanged;
         Closed += (_, _) =>
         {
             log.Events.CollectionChanged -= OnEventsChanged;
+            log.StatusChanged -= OnStatusChanged;
             _view.Filter = null; // the default view is shared: don't leave our filter on it
         };
         Refresh();
     }
 
     private void OnEventsChanged(object? sender, NotifyCollectionChangedEventArgs e) => Refresh();
+
+    private void OnStatusChanged(object? sender, EventArgs e) => Refresh();
 
     private bool Matches(object o)
     {

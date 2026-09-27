@@ -211,6 +211,7 @@ public partial class MainWindow : Window
                 : DateTime.Now + duration.Value;
             CheckOnlySuppressItem(item);
             RefreshSuppressTitle();
+            if (duration != null) _overlay.ClearQueue("HELD"); // waiting panels are held too
         };
         _suppressMenu!.DropDownItems.Add(item);
         return item;
@@ -260,6 +261,7 @@ public partial class MainWindow : Window
     {
         _overlay.OnLeft = _settings.PanelSide == PanelSide.Left;
         _overlay.MaxOnScreen = _settings.MaxPanelsOnScreen;
+        _overlay.MaxQueued = _settings.MaxQueuedPanels;
     }
 
     private Color GlobalColor =>
@@ -553,23 +555,21 @@ public partial class MainWindow : Window
 
         feed.LastNewStory = DateTime.Now;
         var color = ColorFor(feed);
-        var limit = catchUp ? _settings.CatchUpPerFeed : _settings.MaxPanelsPerCheck;
         var held = PanelsSuppressed;
-        var toShow = held ? 0 : Math.Min(limit, stories.Count);
+        var toShow = held ? 0 : catchUp ? Math.Min(_settings.CatchUpPerFeed, stories.Count) : stories.Count;
 
-        // Logged oldest first so History (newest on top) reads in story order.
+        // Oldest first: History (newest on top) reads in story order, and panels queue
+        // in that order so the newest ends up on top of the stack. When the screen is
+        // full they wait their turn (the overlay moves each from QUEUED to PANEL).
         for (var i = stories.Count - 1; i >= 0; i--)
-            _stories.Record(feed, stories[i], color, held ? "HELD" : i < toShow ? "PANEL" : catchUp ? "CATCH-UP" : "OVERFLOW");
+        {
+            var logged = _stories.Record(feed, stories[i], color, held ? "HELD" : i < toShow ? "QUEUED" : "CATCH-UP");
+            if (i < toShow)
+                _overlay.ShowStory(feed, stories[i], color, _settings.PanelDurationSeconds,
+                    _settings.ShowSummary, _settings.ShowImages, logged);
+        }
 
         if (toShow == 0) return;
-
-        // Panels stack newest on top: show the overflow note first, then oldest to newest.
-        var overflow = stories.Count - toShow;
-        if (overflow > 0 && !catchUp)
-            _overlay.ShowOverflow(feed, overflow, color, _settings.PanelDurationSeconds);
-        for (var i = toShow - 1; i >= 0; i--)
-            _overlay.ShowStory(feed, stories[i], color, _settings.PanelDurationSeconds,
-                _settings.ShowSummary, _settings.ShowImages);
 
         if (feed.PlaySound && !_settings.MuteSounds)
             SoundService.PlayNews(); // once per batch, not per panel

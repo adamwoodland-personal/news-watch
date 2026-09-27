@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.Text;
 using System.Windows.Media;
@@ -8,7 +9,7 @@ using Color = System.Windows.Media.Color;
 namespace NewsWatch.Services;
 
 /// <summary>One new story. A snapshot, so it outlives edits to (or removal of) its feed.</summary>
-public sealed class StoryEvent
+public sealed class StoryEvent : INotifyPropertyChanged
 {
     public required DateTime Time { get; init; }
     public required string Feed { get; init; }
@@ -22,8 +23,24 @@ public sealed class StoryEvent
     /// <summary>The feed's panel colour at the time, for the history row.</summary>
     public required System.Windows.Media.Brush FeedBrush { get; init; }
 
-    /// <summary>"PANEL" when it popped up, else why not: HELD (suppressed), OVERFLOW (over the per-check cap).</summary>
-    public required string Shown { get; init; }
+    private string _shown = "";
+
+    /// <summary>
+    /// "PANEL" when it popped up; "QUEUED" while waiting for room on screen; else why not:
+    /// SKIPPED (dropped from the queue), CATCH-UP (over the catch-up limit), HELD (panels on hold).
+    /// </summary>
+    public required string Shown
+    {
+        get => _shown;
+        set
+        {
+            if (_shown == value) return;
+            _shown = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Shown)));
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     public string TimeDisplay => Time.ToString("yyyy-MM-dd  HH:mm", CultureInfo.InvariantCulture);
     public string PublishedDisplay => Published?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? "—";
@@ -43,11 +60,14 @@ public sealed class StoryLog
     /// <summary>Newest first, for binding.</summary>
     public ObservableCollection<StoryEvent> Events { get; } = new();
 
-    public void Record(FeedEntry feed, FeedItem item, Color color, string shown)
+    /// <summary>A story's Shown changed after it was recorded (a queued story got its panel or was skipped).</summary>
+    public event EventHandler? StatusChanged;
+
+    public StoryEvent Record(FeedEntry feed, FeedItem item, Color color, string shown)
     {
         var brush = new SolidColorBrush(color);
         brush.Freeze();
-        Events.Insert(0, new StoryEvent
+        var story = new StoryEvent
         {
             Time = DateTime.Now,
             Feed = feed.Name,
@@ -57,9 +77,12 @@ public sealed class StoryLog
             Published = item.Published?.ToLocalTime(),
             FeedBrush = brush,
             Shown = shown
-        });
+        };
+        story.PropertyChanged += (_, _) => StatusChanged?.Invoke(this, EventArgs.Empty);
+        Events.Insert(0, story);
         while (Events.Count > MaxEvents)
             Events.RemoveAt(Events.Count - 1);
+        return story;
     }
 
     /// <summary>Oldest first: Date, Time, Feed, Published, Title, Link, Shown.</summary>
