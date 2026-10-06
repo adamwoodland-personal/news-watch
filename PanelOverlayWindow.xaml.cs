@@ -409,11 +409,14 @@ public partial class PanelOverlayWindow : Window
             if (open) ValidationHelpers.OpenInBrowser(link);
             DismissTile(tile, feedId);
         }
-        tile.MouseLeftButtonUp += (_, _) => Click(open: ClickOpensStory);
+        tile.MouseLeftButtonUp += (_, e) =>
+        {
+            if (!PanelTouch.FromTouch(e)) Click(open: ClickOpensStory);
+        };
         tile.MouseRightButtonUp += (_, e) =>
         {
             e.Handled = true;
-            Click(open: !ClickOpensStory);
+            if (!PanelTouch.FromTouch(e)) Click(open: !ClickOpensStory);
         };
         tile.ToolTipOpening += (_, _) => tile.ToolTip = ClickTip(link); // follows a settings change
         PanelHost.Children.Insert(0, tile);
@@ -439,19 +442,28 @@ public partial class PanelOverlayWindow : Window
             DismissTile(tile, feedId);
         };
         timer.Start();
-        tile.MouseEnter += (_, _) => timer.Stop();
-        tile.MouseLeave += (_, _) =>
+        void Pause() => timer.Stop();
+        void Resume()
         {
             timer.Interval = TimeSpan.FromSeconds(Math.Min(durationSeconds, 5));
             timer.Start();
-        };
+        }
+        tile.MouseEnter += (_, e) => { if (!PanelTouch.FromTouch(e)) Pause(); };
+        tile.MouseLeave += (_, e) => { if (!PanelTouch.FromTouch(e)) Resume(); };
         tile.Unloaded += (_, _) => timer.Stop();
+
+        // Touch: tap and press-and-hold stand in for the two clicks; a swipe toward the edge throws it off.
+        PanelTouch.Attach(tile, () => _onLeft,
+            tap: () => Click(open: ClickOpensStory),
+            hold: () => Click(open: !ClickOpensStory),
+            swipedOff: () => DismissTile(tile, feedId),
+            started: Pause, ended: Resume);
     }
 
     private string ClickTip(string? link)
-        => link == null ? "Click to dismiss"
-            : ClickOpensStory ? "Click to open the story · right-click to dismiss"
-            : "Click to dismiss · right-click to open the story";
+        => link == null ? "Click or swipe to dismiss"
+            : ClickOpensStory ? "Click to open the story · right-click or swipe to dismiss"
+            : "Click or swipe to dismiss · right-click to open the story";
 
     /// <summary>Slide out the oldest (bottom) panels beyond MaxOnScreen.</summary>
     private void TrimToMax()
@@ -485,11 +497,12 @@ public partial class PanelOverlayWindow : Window
             if (list.Remove(tile) && list.Count == 0) _feedTiles.Remove(id);
         }
 
-        var slideOut = new DoubleAnimation(0, OffscreenX, TimeSpan.FromMilliseconds(300))
+        // From wherever it is now: a swiped panel carries on from under the finger.
+        var slideOut = new DoubleAnimation(OffscreenX, TimeSpan.FromMilliseconds(300))
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
         };
-        var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(260));
+        var fadeOut = new DoubleAnimation(0, TimeSpan.FromMilliseconds(260));
         fadeOut.Completed += (_, _) =>
         {
             PanelHost.Children.Remove(tile);
