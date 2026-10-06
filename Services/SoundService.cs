@@ -20,6 +20,7 @@ public static class SoundService
 
     private static void Play(byte[] wav)
     {
+        if (SessionLock.IsLocked) return; // nobody at the screen: stay quiet
         try
         {
             // SoundPlayer.Play is async (worker thread); a new instance per call

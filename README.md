@@ -36,7 +36,7 @@ Only one instance runs per user; a second launch shows a notice and exits. NEWS/
 | **Check every** | 1–1440 minutes (default 5). |
 | **Only stories mentioning / Skip stories mentioning** | Comma-separated words or phrases, matched case-insensitively as whole words in the headline and summary (`art` won't match `start`). Blank = every story. The list shows `+` / `−` next to a filtered feed. |
 | **Panel colour** | Hex, a quick-pick chip, or click the swatch for any colour. Blank = the default colour from Settings. A live preview shows the panel as it will appear. |
-| **Chime** | A short, quiet three-note rising chime per batch of new stories (deliberately different from PULSE//WATCH's pings). |
+| **Chime** | A short, quiet three-note rising chime per batch of new stories (deliberately different from PULSE//WATCH's pings). Silent while Windows is locked. |
 | **Active** | Untick to pause the feed. |
 
 Double-click a row (or EDIT) to change a feed; REMOVE is in the dialog too and needs a second click within 3 s. Drag rows to reorder. **↻ CHECK NOW** fetches every active feed immediately.
