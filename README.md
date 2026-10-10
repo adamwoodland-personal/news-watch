@@ -2,7 +2,7 @@
 
 WPF (.NET 8) news feed monitor for Windows. Watches RSS, Atom, RSS 1.0 (RDF) and JSON Feed sources on a per-feed interval and slides a panel in at the screen edge whenever a new story appears — headline, summary, thumbnail, in the feed's own colour. Runs from the tray.
 
-A sibling of [PULSE//WATCH](https://github.com/adamwoodland2/pulse-watch): same look, same tray and overlay behaviour. Panels appear on the **left** by default so they never collide with PULSE//WATCH's tiles on the right.
+A sibling of [PULSE//WATCH](https://github.com/adamwoodland-personal/pulse-watch): same look, same tray and overlay behaviour. Panels appear on the **left** by default so they never collide with PULSE//WATCH's tiles on the right.
 
 ## Getting started
 
