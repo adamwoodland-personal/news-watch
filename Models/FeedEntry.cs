@@ -27,8 +27,16 @@ public class FeedEntry : INotifyPropertyChanged
     private string _format = "";
     private DateTime? _lastChecked;
     private DateTime? _lastNewStory;
+    private Guid? _groupId;
 
     public Guid Id { get; set; } = Guid.NewGuid();
+
+    /// <summary>The tab this feed is listed under (a <see cref="FeedGroup"/> Id); null = Default.</summary>
+    public Guid? GroupId
+    {
+        get => _groupId;
+        set { _groupId = value; OnPropertyChanged(); }
+    }
 
     public string Name
     {

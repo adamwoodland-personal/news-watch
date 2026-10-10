@@ -45,6 +45,16 @@ The list shows each feed's status (`LIVE` / `ERROR` / `PENDING` / `PAUSED`), for
 
 **Some feeds to try:** Guardian `https://www.theguardian.com/uk/rss`, Ars Technica `https://feeds.arstechnica.com/arstechnica/index`, Hacker News `https://hnrss.org/frontpage`, a subreddit `https://www.reddit.com/r/worldnews/.rss`, Google News `https://news.google.com/rss?hl=en-GB&gl=GB&ceid=GB:en` (or a search: `https://news.google.com/rss/search?q=your+topic`).
 
+## Groups
+
+Tabs above the list sort feeds into groups, to keep a long list manageable. Grouping is cosmetic only: it never changes how a feed is fetched or whether its stories get panels, and History, the tray icon and CHECK NOW still cover every group.
+
+- **Default** is always the first tab and holds every feed that isn't in another group. **+** after the last tab adds a group and starts renaming it.
+- Double-click a tab (or press F2) to rename it; right-click it for Rename, Move left / Move right and Delete group. Deleting a group moves its feeds to Default.
+- Each feed is in exactly one group. Pick it in the add/edit dialog (the GROUP field, shown once there's more than Default; a new feed starts in the tab that's showing), or drag a row onto a tab.
+- Each tab shows how many feeds it holds, and a red dot while any of them is failing, so a broken feed on a tab that isn't showing still stands out.
+- When the tabs don't all fit, ‹ › arrows at the left step through them (so does the mouse wheel over the tabs). Ctrl+PgUp / Ctrl+PgDn switch tabs. The app reopens on the last tab used.
+
 ## What counts as a new story
 
 - **Seen stories are remembered** per feed in `seen.json`. A story is "seen" if either its id (`guid` / `id`) or its link has been seen before. Links are compared without tracking parameters (`utm_*`, `at_*`, `fbclid`, …) and fragments. This matters for feeds like the BBC's, which bump a story's guid (`…#1` → `…#2`) every time it's edited: an edit doesn't pop the same story again.
@@ -101,9 +111,9 @@ The list shows each feed's status (`LIVE` / `ERROR` / `PENDING` / `PAUSED`), for
 
 ⚙ SETTINGS: X-minimises-to-tray, confirm-before-exit, auto-start at login (minimised); panel side (left by default), left-click to dismiss or open (right-click does the other), panel time, panels on screen, panels waiting in the queue, catch-up per feed, maximum story age, show summaries, show thumbnails; the default panel colour (with picker); version and licence.
 
-Everything — settings and feeds — lives in one JSON file, `%APPDATA%\NewsWatch\settings.json` by default (Config Folder link on the main screen) or whatever `--settings` points at, for easy backup or moving between machines. `seen.json` beside it remembers which stories each feed has produced (delete it and every feed's next check is silent again). Auto-start is the one setting kept in the registry instead, since it embeds the exe path.
+Everything — settings, groups and feeds — lives in one JSON file, `%APPDATA%\NewsWatch\settings.json` by default (Config Folder link on the main screen) or whatever `--settings` points at, for easy backup or moving between machines. `seen.json` beside it remembers which stories each feed has produced (delete it and every feed's next check is silent again). Auto-start is the one setting kept in the registry instead, since it embeds the exe path.
 
-Loading is defensive: out-of-range numbers are clamped, invalid colours reset, duplicate feed IDs regenerated, a feed with an invalid URL paused with a warning, and an unreadable file preserved as `settings.json.corrupt`. Saves are atomic.
+Loading is defensive: out-of-range numbers are clamped, invalid colours reset, duplicate feed and group IDs regenerated, feeds of a missing group returned to Default, a feed with an invalid URL paused with a warning, and an unreadable file preserved as `settings.json.corrupt`. Saves are atomic.
 
 ## Licence
 

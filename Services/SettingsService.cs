@@ -44,6 +44,12 @@ public class AppSettings
     public bool ShowSummary { get; set; } = true;
     public bool ShowImages { get; set; } = true;
 
+    /// <summary>User groups (tabs) in display order, after the built-in Default tab.</summary>
+    public List<FeedGroup> Groups { get; set; } = new();
+
+    /// <summary>The tab that was showing; null = Default.</summary>
+    public Guid? SelectedGroup { get; set; }
+
     public List<FeedEntry> Feeds { get; set; } = new();
 }
 
@@ -162,6 +168,22 @@ public static class SettingsService
         s.CatchUpPerFeed = Math.Clamp(s.CatchUpPerFeed, 0, 20);
         s.MaxStoryAgeHours = Math.Clamp(s.MaxStoryAgeHours, 0, 24 * 30);
 
+        s.Groups ??= new List<FeedGroup>();
+        s.Groups.RemoveAll(g => g == null);
+        var groupIds = new HashSet<Guid>();
+        var groupNames = new List<string> { FeedGroup.DefaultName };
+        foreach (var g in s.Groups)
+        {
+            if (g.Id == Guid.Empty || !groupIds.Add(g.Id))
+            {
+                g.Id = Guid.NewGuid();
+                groupIds.Add(g.Id);
+            }
+            g.Name = FeedGroup.Unique(FeedGroup.CleanName(g.Name) ?? "Group", groupNames);
+            groupNames.Add(g.Name);
+        }
+        if (s.SelectedGroup is Guid selected && !groupIds.Contains(selected)) s.SelectedGroup = null;
+
         s.Feeds ??= new List<FeedEntry>();
         s.Feeds.RemoveAll(f => f == null);
 
@@ -173,6 +195,7 @@ public static class SettingsService
                 f.Id = Guid.NewGuid(); // duplicate ids would cross-wire loops and seen-story history
                 seenIds.Add(f.Id);
             }
+            if (f.GroupId is Guid groupId && !groupIds.Contains(groupId)) f.GroupId = null; // lost group: back to Default
             f.Name ??= "";
             f.IncludeKeywords ??= "";
             f.ExcludeKeywords ??= "";

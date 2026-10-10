@@ -29,6 +29,7 @@ public partial class EditFeedWindow : Window
 
     private readonly string _globalColor;
     private readonly string? _originalUrl;
+    private readonly List<Guid?> _groupIds = new(); // parallel to GroupCombo's items; null = Default
     private readonly DispatcherTimer _removeArmTimer = new() { Interval = TimeSpan.FromSeconds(3) };
     private readonly CancellationTokenSource _closing = new();
 
@@ -44,11 +45,13 @@ public partial class EditFeedWindow : Window
     private string? _lastTestedUrl;
     private bool _testing;
 
-    public EditFeedWindow(AppSettings settings)
+    /// <param name="group">The group a new feed starts in (the tab that's showing); null = Default.</param>
+    public EditFeedWindow(AppSettings settings, Guid? group = null)
     {
         InitializeComponent();
         Icon = AppIcon.WindowIcon;
         _globalColor = settings.PanelColor;
+        FillGroups(settings.Groups, group);
         _removeArmTimer.Tick += (_, _) => DisarmRemove();
         SourceInitialized += (_, _) => MaxHeight = WorkArea().Height;
         Loaded += (_, _) => { KeepOnScreen(); UrlBox.Focus(); };
@@ -58,7 +61,7 @@ public partial class EditFeedWindow : Window
         RefreshPreview();
     }
 
-    public EditFeedWindow(AppSettings settings, FeedEntry existing) : this(settings)
+    public EditFeedWindow(AppSettings settings, FeedEntry existing) : this(settings, existing.GroupId)
     {
         HeaderText.Text = "EDIT FEED";
         Title = "Edit feed";
@@ -101,6 +104,21 @@ public partial class EditFeedWindow : Window
     // Hairline above the footer while the form is cut off, so it reads as scrollable.
     private void FormScroller_ScrollChanged(object sender, ScrollChangedEventArgs e)
         => FooterBar.BorderThickness = new Thickness(0, FormScroller.ScrollableHeight > 0 ? 1 : 0, 0, 0);
+
+    // ===== Group =====
+
+    private void FillGroups(IEnumerable<FeedGroup> groups, Guid? selected)
+    {
+        GroupCombo.Items.Add(new ComboBoxItem { Content = FeedGroup.DefaultName });
+        _groupIds.Add(null);
+        foreach (var group in groups)
+        {
+            GroupCombo.Items.Add(new ComboBoxItem { Content = group.Name });
+            _groupIds.Add(group.Id);
+        }
+        GroupCombo.SelectedIndex = Math.Max(0, _groupIds.IndexOf(selected));
+        GroupPanel.Visibility = _groupIds.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     // ===== Colour + preview =====
 
@@ -353,7 +371,8 @@ public partial class EditFeedWindow : Window
             ExcludeKeywords = TidyKeywords(ExcludeBox.Text),
             Enabled = ActiveCheck.IsChecked == true,
             PlaySound = SoundCheck.IsChecked == true,
-            Color = color.Length > 0 ? color : null
+            Color = color.Length > 0 ? color : null,
+            GroupId = _groupIds[Math.Max(0, GroupCombo.SelectedIndex)]
         };
         DialogResult = true;
     }

@@ -86,10 +86,95 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
+        <!-- Group tab: dim name, accent with a glowing underline when selected. -->
+        <Style x:Key="GroupTabItem" TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="{StaticResource TextDimBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="AllowDrop" Value="True"/>
+            <EventSetter Event="DragOver" Handler="Tab_DragOver"/>
+            <EventSetter Event="DragLeave" Handler="Tab_DragLeave"/>
+            <EventSetter Event="Drop" Handler="Tab_Drop"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Grid>
+                            <Border x:Name="bd" Background="Transparent" CornerRadius="3,3,0,0" Padding="14,8,14,9">
+                                <ContentPresenter/>
+                            </Border>
+                            <Border x:Name="underline" Height="2" VerticalAlignment="Bottom" Background="Transparent"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                <Setter TargetName="bd" Property="Background" Value="#0AFFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="bd" Property="Background" Value="#0F00E5FF"/>
+                                <Setter TargetName="underline" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="underline" Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect Color="#00E5FF" BlurRadius="8" ShadowDepth="0" Opacity="0.7"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsDropTarget}" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="bd" Property="Background" Value="#2200E5FF"/>
+                                <Setter TargetName="underline" Property="Background" Value="{StaticResource AccentBrush}"/>
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Borderless "+" after the last tab. -->
+        <Style x:Key="TabAddButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource TextDimBrush}"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="Transparent" CornerRadius="3" Padding="10,3" Margin="4,0,0,2">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="bd" Property="Background" Value="#1400E5FF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#3300E5FF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Excel-style arrows that step through the tabs when they don't all fit. -->
+        <Style x:Key="TabArrow" TargetType="RepeatButton" BasedOn="{StaticResource SpinButton}">
+            <Setter Property="Width" Value="22"/>
+            <Setter Property="Interval" Value="150"/>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.3"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
@@ -119,8 +204,107 @@
             </Grid>
         </Border>
 
+        <!-- ===== Group tabs ===== -->
+        <Grid Grid.Row="1" Margin="24,12,24,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Border Grid.ColumnSpan="2" Height="1" VerticalAlignment="Bottom"
+                    Background="{StaticResource BorderBrush}"/>
+
+            <!-- Only shown while the tabs don't all fit. -->
+            <StackPanel x:Name="TabArrows" Orientation="Horizontal" Margin="0,0,6,1" Visibility="Collapsed">
+                <RepeatButton x:Name="TabsLeftButton" Style="{StaticResource TabArrow}"
+                              Content="M4,0 L0,4 L4,8" Click="TabsLeft_Click" ToolTip="Scroll the tabs left"/>
+                <RepeatButton x:Name="TabsRightButton" Style="{StaticResource TabArrow}"
+                              Content="M0,0 L4,4 L0,8" Click="TabsRight_Click" ToolTip="Scroll the tabs right"/>
+            </StackPanel>
+
+            <!-- "+" follows the last tab, and stays pinned at the edge once the tabs overflow. -->
+            <DockPanel Grid.Column="1" HorizontalAlignment="Left">
+                <Button DockPanel.Dock="Right" Content="+" Style="{StaticResource TabAddButton}"
+                        ToolTip="New group" Click="AddGroup_Click"/>
+                <ScrollViewer x:Name="TabScroller" Focusable="False"
+                              HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                              ScrollChanged="TabScroller_ScrollChanged"
+                              PreviewMouseWheel="TabScroller_PreviewMouseWheel">
+                    <ListBox x:Name="TabList" Background="Transparent" BorderThickness="0"
+                             ItemContainerStyle="{StaticResource GroupTabItem}"
+                             IsTextSearchEnabled="False"
+                             SelectionChanged="TabList_SelectionChanged"
+                             MouseDoubleClick="TabList_MouseDoubleClick"
+                             KeyDown="TabList_KeyDown">
+                        <ListBox.Template>
+                            <ControlTemplate TargetType="ListBox">
+                                <ItemsPresenter/>
+                            </ControlTemplate>
+                        </ListBox.Template>
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" Background="Transparent"
+                                            ToolTip="{Binding Summary}"
+                                            ContextMenuService.IsEnabled="{Binding CanEdit}">
+                                    <StackPanel.ContextMenu>
+                                        <ContextMenu Style="{StaticResource NeonMenu}">
+                                            <MenuItem Header="Rename" Click="RenameGroup_Click"/>
+                                            <MenuItem Header="Move left" Click="MoveGroupLeft_Click"
+                                                      IsEnabled="{Binding CanMoveLeft}"/>
+                                            <MenuItem Header="Move right" Click="MoveGroupRight_Click"
+                                                      IsEnabled="{Binding CanMoveRight}"/>
+                                            <Separator/>
+                                            <MenuItem Header="Delete group" Click="DeleteGroup_Click"
+                                                      Foreground="{StaticResource OfflineBrush}"/>
+                                        </ContextMenu>
+                                    </StackPanel.ContextMenu>
+
+                                    <!-- A feed in this group is failing. -->
+                                    <Ellipse Width="7" Height="7" Margin="0,1,7,0" VerticalAlignment="Center"
+                                             Fill="{StaticResource OfflineBrush}"
+                                             Visibility="{Binding HasFailing, Converter={StaticResource BoolToVis}}">
+                                        <Ellipse.Effect>
+                                            <DropShadowEffect Color="#FF3B5C" BlurRadius="8" ShadowDepth="0" Opacity="0.9"/>
+                                        </Ellipse.Effect>
+                                    </Ellipse>
+
+                                    <Grid VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="SemiBold">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                            <Setter Property="Visibility" Value="Hidden"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBox Style="{StaticResource NeonTextBox}" FontSize="12.5" FontWeight="SemiBold"
+                                                 Padding="2,0" Margin="-4,-3" MinWidth="110"
+                                                 MaxLength="{x:Static models:FeedGroup.MaxNameLength}"
+                                                 Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}"
+                                                 IsVisibleChanged="RenameBox_IsVisibleChanged"
+                                                 KeyDown="RenameBox_KeyDown"
+                                                 LostKeyboardFocus="RenameBox_LostKeyboardFocus"/>
+                                    </Grid>
+
+                                    <TextBlock Text="{Binding Count}" FontFamily="Consolas" FontSize="11"
+                                               Margin="8,1,0,0" VerticalAlignment="Center" Opacity="0.7"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </ScrollViewer>
+            </DockPanel>
+        </Grid>
+
         <!-- ===== Feed list ===== -->
-        <Grid Grid.Row="1" Margin="24,18,24,0">
+        <Grid Grid.Row="2" Margin="24,12,24,0">
             <ListBox x:Name="FeedList"
                      Background="Transparent"
                      BorderThickness="0"
@@ -198,16 +382,16 @@
             <!-- Empty state -->
             <StackPanel x:Name="EmptyState" VerticalAlignment="Center" HorizontalAlignment="Center"
                         Visibility="Collapsed">
-                <TextBlock Text="NO FEEDS CONFIGURED" Foreground="{StaticResource TextDimBrush}"
+                <TextBlock x:Name="EmptyTitle" Text="NO FEEDS CONFIGURED" Foreground="{StaticResource TextDimBrush}"
                            FontFamily="Consolas" FontSize="16" HorizontalAlignment="Center"/>
-                <TextBlock Text="Add an RSS, Atom or JSON feed (or a news site's address) below."
+                <TextBlock x:Name="EmptyHint" Text="Add an RSS, Atom or JSON feed (or a news site's address) below."
                            Foreground="{StaticResource TextDimBrush}" FontSize="12"
                            HorizontalAlignment="Center" Margin="0,6,0,0" Opacity="0.7"/>
             </StackPanel>
         </Grid>
 
         <!-- ===== Footer actions ===== -->
-        <Border Grid.Row="2" Background="{StaticResource PanelBrush}"
+        <Border Grid.Row="3" Background="{StaticResource PanelBrush}"
                 BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0"
                 Padding="24,14">
             <Grid>

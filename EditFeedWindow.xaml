@@ -93,6 +93,15 @@
                     </StackPanel>
                 </Grid>
 
+                <!-- Which tab lists it. Only shown once there's more than the Default tab. -->
+                <StackPanel x:Name="GroupPanel" Margin="0,14,0,0" Visibility="Collapsed">
+                    <TextBlock Text="GROUP" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox x:Name="GroupCombo" Style="{StaticResource NeonCombo}" HorizontalAlignment="Left"
+                              Width="{Binding ActualWidth, ElementName=NameBox}"
+                              Height="{Binding ActualHeight, ElementName=NameBox}"
+                              ToolTip="The tab this feed is listed under. Only changes where it shows."/>
+                </StackPanel>
+
                 <!-- ===== Filters ===== -->
                 <Grid Margin="0,20,0,8">
                     <Grid.ColumnDefinitions>

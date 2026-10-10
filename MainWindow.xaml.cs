@@ -1,23 +1,32 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using NewsWatch.Models;
 using NewsWatch.Services;
 using WinForms = System.Windows.Forms;
 using Color = System.Windows.Media.Color;
 using Point = System.Windows.Point;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
+using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using DragEventArgs = System.Windows.DragEventArgs;
 using DragDrop = System.Windows.DragDrop;
 using DragDropEffects = System.Windows.DragDropEffects;
+using TextBox = System.Windows.Controls.TextBox;
+using SelectionChangedEventArgs = System.Windows.Controls.SelectionChangedEventArgs;
+using ScrollChangedEventArgs = System.Windows.Controls.ScrollChangedEventArgs;
 
 namespace NewsWatch;
 
 public partial class MainWindow : Window
 {
     private readonly ObservableCollection<FeedEntry> _feeds = new();
+    private readonly ObservableCollection<GroupTab> _tabs = new();
+    private readonly System.Windows.Data.ListCollectionView _view; // the rows on the selected tab
+    private Guid? _selectedGroup; // null = Default
     private readonly FeedMonitor _monitor = new();
     private readonly PanelOverlayWindow _overlay = new();
     private readonly StoryLog _stories = new();
@@ -67,15 +76,31 @@ public partial class MainWindow : Window
                 "NEWS//WATCH", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
-        FeedList.ItemsSource = _feeds;
+        // The list shows one group (tab) at a time; a feed moved to another
+        // group drops out of view as soon as its GroupId changes.
+        _view = new System.Windows.Data.ListCollectionView(_feeds)
+        {
+            Filter = item => ((FeedEntry)item).GroupId == _selectedGroup,
+            IsLiveFiltering = true
+        };
+        _view.LiveFilteringProperties.Add(nameof(FeedEntry.GroupId));
+        ((INotifyCollectionChanged)_view).CollectionChanged += (_, _) => UpdateEmptyState();
+        FeedList.ItemsSource = _view;
         FeedList.SelectionChanged += (_, _) =>
         {
             var hasSelection = FeedList.SelectedItem != null;
             EditButton.IsEnabled = hasSelection;
             RemoveButton.IsEnabled = hasSelection;
         };
-        _feeds.CollectionChanged += (_, _) => UpdateEmptyState();
+
+        _tabs.Add(GroupTab.Default());
+        foreach (var group in _settings.Groups)
+            _tabs.Add(new GroupTab { Id = group.Id, Name = group.Name });
+        TabList.ItemsSource = _tabs;
+        ShowGroup(_settings.SelectedGroup);
+        RefreshTabs();
         UpdateEmptyState();
+        Loaded += (_, _) => BringTabIntoView(TabList.SelectedItem);
 
         _trayIcon = CreateTrayIcon();
         StateChanged += (_, _) =>
@@ -314,12 +339,23 @@ public partial class MainWindow : Window
     // ===== State =====
 
     private void UpdateEmptyState()
-        => EmptyState.Visibility = _feeds.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    {
+        EmptyState.Visibility = _view.IsEmpty ? Visibility.Visible : Visibility.Collapsed;
+        var none = _feeds.Count == 0;
+        EmptyTitle.Text = none ? "NO FEEDS CONFIGURED" : "NO FEEDS IN THIS GROUP";
+        EmptyHint.Text = none
+            ? "Add an RSS, Atom or JSON feed (or a news site's address) below."
+            : "Add one below, or drag a feed here from another tab.";
+    }
 
     private void SaveSettings()
     {
         UpdateTrayIcon(); // list or status just changed (remove/pause/edit)
+        RefreshTabs();
         _settings.Feeds = _feeds.ToList();
+        _settings.Groups = _tabs.Where(t => t.Id != null)
+            .Select(t => new FeedGroup { Id = t.Id!.Value, Name = t.Name }).ToList();
+        _settings.SelectedGroup = _selectedGroup;
         if (!SettingsService.Save(_settings))
         {
             _trayIcon?.ShowBalloonTip(3000, "NEWS//WATCH",
@@ -332,7 +368,7 @@ public partial class MainWindow : Window
 
     private void Add_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new EditFeedWindow(_settings) { Owner = this };
+        var dialog = new EditFeedWindow(_settings, _selectedGroup) { Owner = this };
         if (dialog.ShowDialog() == true && dialog.Result != null)
         {
             var feed = dialog.Result;
@@ -341,6 +377,7 @@ public partial class MainWindow : Window
             if (feed.Enabled)
                 _monitor.Start(feed);
             SaveSettings();
+            ShowGroup(feed.GroupId); // added to another group: go there so it's in view
         }
     }
 
@@ -457,6 +494,7 @@ public partial class MainWindow : Window
         feed.Color = result.Color;
         feed.IncludeKeywords = result.IncludeKeywords;
         feed.ExcludeKeywords = result.ExcludeKeywords;
+        feed.GroupId = result.GroupId;
         feed.Enabled = result.Enabled;
         if (!feed.Enabled)
             _fetchedThisSession.Remove(feed.Id); // resuming later gets the catch-up treatment, like a relaunch
@@ -489,6 +527,247 @@ public partial class MainWindow : Window
         _seen.SaveIfDirty();
     }
 
+    // ===== Groups (tabs) =====
+    // Cosmetic only: a group decides which tab lists a feed, never how it's fetched or announced.
+
+    /// <summary>Show a group's tab (null or unknown = Default).</summary>
+    private void ShowGroup(Guid? id) => TabList.SelectedItem = _tabs.FirstOrDefault(t => t.Id == id) ?? _tabs[0];
+
+    private void TabList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (TabList.SelectedItem is not GroupTab tab)
+        {
+            // Ctrl+click can deselect a ListBox item, but a tab is always showing.
+            ShowGroup(e.RemovedItems.OfType<GroupTab>().FirstOrDefault(_tabs.Contains)?.Id);
+            return;
+        }
+        _selectedGroup = tab.Id;
+        FeedList.SelectedItem = null;
+        _view.Refresh();
+        BringTabIntoView(tab);
+    }
+
+    /// <summary>Counts, red dots and move-left/right availability on every tab.</summary>
+    private void RefreshTabs()
+    {
+        for (var i = 0; i < _tabs.Count; i++)
+        {
+            var tab = _tabs[i];
+            tab.Count = _feeds.Count(f => f.GroupId == tab.Id);
+            tab.Failing = _feeds.Count(f => f.GroupId == tab.Id && f.Enabled && f.Status == FeedStatus.Error);
+            tab.CanMoveLeft = i > 1; // Default stays first
+            tab.CanMoveRight = i > 0 && i < _tabs.Count - 1;
+        }
+    }
+
+    // Ctrl+PgUp / Ctrl+PgDn step through the tabs, as in Excel and browsers.
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        if (Keyboard.Modifiers == ModifierKeys.Control && e.Key is Key.PageUp or Key.PageDown)
+        {
+            var next = TabList.SelectedIndex + (e.Key == Key.PageDown ? 1 : -1);
+            if (next >= 0 && next < _tabs.Count) TabList.SelectedIndex = next;
+            e.Handled = true;
+            return;
+        }
+        base.OnPreviewKeyDown(e);
+    }
+
+    private void AddGroup_Click(object sender, RoutedEventArgs e)
+    {
+        var tab = new GroupTab { Id = Guid.NewGuid(), Name = FeedGroup.Unique("New group", _tabs.Select(t => t.Name)) };
+        _tabs.Add(tab);
+        TabList.SelectedItem = tab;
+        SaveSettings();
+        BeginRename(tab);
+    }
+
+    private static GroupTab? MenuTab(object sender) => (sender as FrameworkElement)?.DataContext as GroupTab;
+
+    private void RenameGroup_Click(object sender, RoutedEventArgs e)
+    {
+        if (MenuTab(sender) is { } tab) BeginRename(tab);
+    }
+
+    private void MoveGroupLeft_Click(object sender, RoutedEventArgs e) => MoveGroup(MenuTab(sender), -1);
+
+    private void MoveGroupRight_Click(object sender, RoutedEventArgs e) => MoveGroup(MenuTab(sender), +1);
+
+    private void MoveGroup(GroupTab? tab, int by)
+    {
+        if (tab == null) return;
+        var from = _tabs.IndexOf(tab);
+        var to = from + by;
+        if (from < 1 || to < 1 || to >= _tabs.Count) return; // Default stays first
+        _tabs.Move(from, to);
+        SaveSettings();
+        BringTabIntoView(tab);
+    }
+
+    /// <summary>Its feeds move to Default; nothing stops being checked.</summary>
+    private void DeleteGroup_Click(object sender, RoutedEventArgs e)
+    {
+        if (MenuTab(sender) is not { CanEdit: true } tab) return;
+        var members = _feeds.Where(f => f.GroupId == tab.Id).ToList();
+        if (members.Count > 0)
+        {
+            var moving = members.Count == 1 ? "Its feed moves" : $"Its {members.Count} feeds move";
+            var answer = System.Windows.MessageBox.Show(this,
+                $"Delete the group \"{tab.Name}\"?\n\n{moving} to {FeedGroup.DefaultName} and keep being checked.",
+                "NEWS//WATCH", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+            if (answer != MessageBoxResult.Yes) return;
+        }
+
+        foreach (var feed in members) feed.GroupId = null;
+        if (ReferenceEquals(TabList.SelectedItem, tab))
+            TabList.SelectedItem = _tabs[_tabs.IndexOf(tab) - 1];
+        _tabs.Remove(tab);
+        SaveSettings();
+    }
+
+    // ----- Rename in place (double-click, F2, or the tab's menu) -----
+
+    private void BeginRename(GroupTab tab)
+    {
+        if (!tab.CanEdit) return;
+        TabList.SelectedItem = tab;
+        tab.IsEditing = true; // shows the tab's TextBox, which focuses itself
+    }
+
+    private void TabList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (FindListBoxItem(e.OriginalSource) is { DataContext: GroupTab { IsEditing: false } tab })
+            BeginRename(tab);
+    }
+
+    private void TabList_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.F2 && TabList.SelectedItem is GroupTab { IsEditing: false } tab)
+        {
+            BeginRename(tab);
+            e.Handled = true;
+        }
+    }
+
+    private void RenameBox_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (sender is not TextBox { DataContext: GroupTab tab, IsVisible: true } box) return;
+        box.Text = tab.Name;
+        // Late enough that a closing context menu has finished handing focus back.
+        Dispatcher.InvokeAsync(() =>
+        {
+            box.Focus();
+            box.SelectAll();
+        }, DispatcherPriority.ContextIdle);
+    }
+
+    private void RenameBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (sender is not TextBox { DataContext: GroupTab tab } box) return;
+        if (e.Key == Key.Enter) CommitRename(tab, box.Text);
+        else if (e.Key == Key.Escape) tab.IsEditing = false;
+        else return;
+        e.Handled = true;
+        (TabList.ItemContainerGenerator.ContainerFromItem(tab) as UIElement)?.Focus();
+    }
+
+    private void RenameBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (sender is TextBox { DataContext: GroupTab { IsEditing: true } tab } box)
+            CommitRename(tab, box.Text);
+    }
+
+    /// <summary>Blank keeps the old name; a name another tab has gets a number.</summary>
+    private void CommitRename(GroupTab tab, string text)
+    {
+        tab.IsEditing = false;
+        if (FeedGroup.CleanName(text) is not string name || name == tab.Name) return;
+        tab.Name = FeedGroup.Unique(name, _tabs.Where(t => t != tab).Select(t => t.Name));
+        SaveSettings();
+    }
+
+    // ----- Tab overflow: Excel-style arrows, and the mouse wheel -----
+
+    private void TabScroller_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        TabArrows.Visibility = TabScroller.ScrollableWidth > 0.5 ? Visibility.Visible : Visibility.Collapsed;
+        TabsLeftButton.IsEnabled = TabScroller.HorizontalOffset > 0.5;
+        TabsRightButton.IsEnabled = TabScroller.HorizontalOffset < TabScroller.ScrollableWidth - 0.5;
+    }
+
+    private void TabsLeft_Click(object sender, RoutedEventArgs e) => ScrollTabs(-1);
+
+    private void TabsRight_Click(object sender, RoutedEventArgs e) => ScrollTabs(+1);
+
+    private void TabScroller_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        ScrollTabs(e.Delta > 0 ? -1 : +1);
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// One tab at a time: right brings the next cut-off tab fully into view, left the previous one.
+    /// A tab cut off by only a sliver is skipped, so every click visibly moves.
+    /// </summary>
+    private void ScrollTabs(int direction)
+    {
+        const double minStep = 12;
+        var offset = TabScroller.HorizontalOffset;
+        var viewRight = offset + TabScroller.ViewportWidth;
+        var edges = _tabs.Select(t => TabList.ItemContainerGenerator.ContainerFromItem(t))
+            .OfType<FrameworkElement>()
+            .Select(c =>
+            {
+                var left = c.TransformToAncestor(TabList).Transform(new Point(0, 0)).X;
+                return (Left: left, Right: left + c.ActualWidth);
+            })
+            .ToList();
+
+        if (direction > 0)
+        {
+            foreach (var tab in edges)
+                if (tab.Right > viewRight + minStep) { TabScroller.ScrollToHorizontalOffset(tab.Right - TabScroller.ViewportWidth); return; }
+            TabScroller.ScrollToRightEnd();
+        }
+        else
+        {
+            for (var i = edges.Count - 1; i >= 0; i--)
+                if (edges[i].Left < offset - minStep) { TabScroller.ScrollToHorizontalOffset(edges[i].Left); return; }
+            TabScroller.ScrollToLeftEnd();
+        }
+    }
+
+    private void BringTabIntoView(object? tab)
+        => (tab == null ? null : TabList.ItemContainerGenerator.ContainerFromItem(tab) as FrameworkElement)?.BringIntoView();
+
+    // ----- Drag a feed row onto a tab to move it to that group -----
+
+    private static FeedEntry? DraggedFeed(DragEventArgs e) => e.Data.GetData(typeof(FeedEntry)) as FeedEntry;
+
+    private void Tab_DragOver(object sender, DragEventArgs e)
+    {
+        var tab = (sender as FrameworkElement)?.DataContext as GroupTab;
+        var ok = tab != null && DraggedFeed(e) is { } feed && feed.GroupId != tab.Id;
+        e.Effects = ok ? DragDropEffects.Move : DragDropEffects.None;
+        if (tab != null) tab.IsDropTarget = ok;
+        e.Handled = true;
+    }
+
+    private void Tab_DragLeave(object sender, DragEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is GroupTab tab) tab.IsDropTarget = false;
+    }
+
+    private void Tab_Drop(object sender, DragEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not GroupTab tab) return;
+        tab.IsDropTarget = false;
+        e.Handled = true;
+        if (DraggedFeed(e) is not { } feed || feed.GroupId == tab.Id || !_feeds.Contains(feed)) return;
+        feed.GroupId = tab.Id; // no restart: grouping doesn't touch the fetch loop
+        SaveSettings();
+    }
+
     private void ConfigFolder_Click(object sender, RoutedEventArgs e)
     {
         System.IO.Directory.CreateDirectory(SettingsService.Dir);
@@ -519,6 +798,7 @@ public partial class MainWindow : Window
                 App.LogError($"Processing \"{e.Feed.Name}\" ({e.Feed.Url})", ex);
             }
             UpdateTrayIcon();
+            RefreshTabs();
         });
     }
 
